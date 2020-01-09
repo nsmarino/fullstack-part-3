@@ -1,92 +1,103 @@
+require('dotenv').config()
 const express = require('express')
 const app = express()
 const bodyParser = require('body-parser')
 const cors = require('cors')
-
+const Contact = require('./models/contact')
+ 
 app.use(express.static('build'))
-
 app.use(cors())
-//const morgan = require('morgan')
-
 app.use(bodyParser.json())
-
-//morgan.token('content', function (req, res) { return JSON.stringify(req.body)})
-
-//app.use(morgan(':method :url :status :res[content-length] - :response-time ms :content'))
-
-let persons = [
-      {
-        name: "Tom Joad",
-        number: "666n",
-        id: 5
-      },
-      {
-        name: "jjjjjj",
-        number: "lllllllll",
-        id: 8
-      },
-      {
-        name: "gggggggggggggg",
-        number: "yyyyyyyyyyyy",
-        id: 9
-      },
-    ]
 
 const generateId = () => Math.floor(Math.random()*10000)
 
-app.get('/api/persons', (req, res) => {
-    res.json(persons)
+app.get('/api/persons', (req, res, next) => {
+    Contact.find({}).then(contacts => {
+        res.json(contacts.map(c => c.toJSON()))
+    })
+    .catch(error => next(error))
 })
 
 app.get('/info', (req, res) => {
-    res.send(`<div><p>Phonebook currently has info on ${persons.length} people.</p><p>${new Date()}</p></div>`)
+    Contact.find({})
+      .then(contacts => 
+      res.send(`<div><p>Phonebook currently has info on ${contacts.length} people.</p><p>${new Date()}</p></div>`)
+    )
 })
 
-app.get('/api/persons/:id', (req, res) => {
-    const id = Number(req.params.id)
-    const person = persons.find(person => person.id === id)
+app.get('/api/persons/:id', (req, res, next) => {
+  Contact.findById(req.params.id).then(person => {
     if (person) {
-    res.json(person)
+      res.json(person)
     } else {
         res.status(404).end()
     }
+  })
+  .catch(error => next(error))
 })
 
-app.post('/api/persons', (req, res) => {
+app.post('/api/persons', (req, res, next) => {
     const name = req.body.name
     const number = req.body.number
-    const matchFound = persons.some(person => person.name === name)
-
-    if (!name || !number || matchFound ) {
-        return res.status(400).json({error: 'content missing'})
-    }
-
-    const person = {
+    // if (!name || !number) {
+    //     return res.status(400).json({error: 'content missing'})
+    // }
+    const person = new Contact({
         name: name,
         number: number,
         id: generateId(),
+    })
+
+    person
+      .save()
+      .then(savedPerson => res.json(savedPerson.toJSON()))
+      .catch(error => next(error))
+})
+
+app.put('/api/persons/:id', (req, res, next) => {
+    const body = req.body
+    const contact = {
+      name: body.name,
+      number: body.number,
     }
+    Contact.findByIdAndUpdate(req.params.id, contact, { new: true })
+      .then(updatedContact => {
+        res.json(updatedContact.toJSON())
+      })
+      .catch(error => next(error))
+  })
 
-    persons = persons.concat(person)
-    res.json(person)
-
-})
-
-app.delete('/api/persons/:id', (req, res) => {
-    const id = Number(req.params.id)
-    persons = persons.filter(person => person.id !== id)
-
+app.delete('/api/persons/:id', (req, res, next) => {
+  Contact.findByIdAndRemove(req.params.id)
+  .then(result => {
     res.status(204).end()
+  })
+  .catch(error => next(error))
 })
+
+
 
 const unknownEndpoint = (req, res) => {
     res.status(404).send({ error: 'unknown endpoint' })
 }
-
 app.use(unknownEndpoint)
-
+const errorHandler = (error, request, response, next) => {
+    console.error(`error begins here - ${error.message}`)
+    if (error.name === 'CastError' && error.kind === 'ObjectId') {
+        return response.status(400).send({ error: 'malformatted id'})
+    } else if (error.name === 'ValidationError') {
+      return response.status(400).send({ error: `Name or number is not valid. ${error.message}`})
+    }
+    
+    next(error)
+}
+app.use(errorHandler)
 
 const PORT = process.env.PORT || 3001
 app.listen(PORT, () => {
     console.log(`server running on port ${PORT}`)
 })
+
+//const morgan = require('morgan')
+//morgan.token('content', function (req, res) { return JSON.stringify(req.body)})
+//app.use(morgan(':method :url :status :res[content-length] - :response-time ms :content'))
