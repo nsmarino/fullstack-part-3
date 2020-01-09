@@ -5,9 +5,11 @@ const bodyParser = require('body-parser')
 const cors = require('cors')
 const Contact = require('./models/contact')
  
-app.use(express.static('build'))
-app.use(cors())
 app.use(bodyParser.json())
+app.use(cors())
+app.use(express.static('build'))
+
+
 
 const generateId = () => Math.floor(Math.random()*10000)
 
@@ -39,9 +41,6 @@ app.get('/api/persons/:id', (req, res, next) => {
 app.post('/api/persons', (req, res, next) => {
     const name = req.body.name
     const number = req.body.number
-    // if (!name || !number) {
-    //     return res.status(400).json({error: 'content missing'})
-    // }
     const person = new Contact({
         name: name,
         number: number,
@@ -97,7 +96,3 @@ const PORT = process.env.PORT || 3001
 app.listen(PORT, () => {
     console.log(`server running on port ${PORT}`)
 })
-
-//const morgan = require('morgan')
-//morgan.token('content', function (req, res) { return JSON.stringify(req.body)})
-//app.use(morgan(':method :url :status :res[content-length] - :response-time ms :content'))
